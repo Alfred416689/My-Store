@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Carousel with Zoom Controls</title>
+    <style>
+        /* Container and Background Animation */
+        .container {
+            width: 100%;
+            max-width: 2100px;
+            text-align: center;
+            background: url('nike55.jpg') repeat;
+            height: 1000px;
+            
+            animation: scroll-bg 30s linear infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        @keyframes scroll-bg {
+            from {
+                background-position: 0 0;
+            }
+            to {
+                background-position: 100% 100%;
+            }
+        }
+
+        /* Back Button */
+        .back-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px 20px;
+            background-color: #ffffffcc;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* Glass Effect Wrapper */
+        .wrapper {
+            width: 90%;
+            height: 700px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Carousel */
+        .carousel {
+            width: 100%;
+            height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .carousel img {
+            max-width: 120%;
+            max-height: 100%;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        /* Thumbnails Section */
+        .thumbnails {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .thumbnail {
+            width: 60px;
+            height: 60px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: border 0.3s;
+        }
+
+        .thumbnail:hover {
+            border: 2px solid #000;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .zoom-button {
+            font-size: 20px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            border: 2px solid #000;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .zoom-button:hover {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Back Button -->
+        <button class="back-button" onclick="window.location.href='index.html';">Back</button>
+
+        <!-- Wrapper with Glass Effect -->
+        <div class="wrapper">
+            <div class="carousel" id="carousel">
+                <img src="j5.jpg" alt="Image 1" id="mainImage">
+            </div>
+
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button class="zoom-button" onclick="zoomImage(1)">+</button>
+                <button class="zoom-button" onclick="zoomImage(-1)">−</button>
+            </div>
+
+            <!-- Thumbnails Section -->
+            <div class="thumbnails">
+                <div class="thumbnail" onclick="swapImage('j5.jpg')">
+                    <img src="j5.jpg" alt="Thumbnail 1">
+                </div>
+                <div class="thumbnail" onclick="swapImage('j3.jpg')">
+                    <img src="j3.jpg" alt="Thumbnail 2">
+                </div>
+                <div class="thumbnail" onclick="swapImage('j2.jpg')">
+                    <img src="j2.jpg" alt="Thumbnail 3">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mainImage = document.getElementById('mainImage');
+        let zoomLevel = 1; // Default zoom level
+
+        // Function to zoom image
+        function zoomImage(direction) {
+            zoomLevel += direction * 0.5; // Adjust zoom level
+            zoomLevel = Math.max(1.0, Math.min(zoomLevel, 3)); // Limit zoom between 1x and 3x
+            mainImage.style.transform = `scale(${zoomLevel})`;
+        }
+
+        // Function to swap images
+        function swapImage(newSrc) {
+            mainImage.src = newSrc; // Set the new main image
+
+            // Update the border to highlight the selected thumbnail
+            const thumbnails = document.querySelectorAll('.thumbnail img');
+            thumbnails.forEach(thumbnail => {
+                if (thumbnail.src.includes(newSrc)) {
+                    thumbnail.parentElement.style.border = '2px solid #000'; // Highlight border
+                } else {
+                    thumbnail.parentElement.style.border = '2px solid transparent'; // Reset border
+                }
+            });
+        }
+    </script>
+</body>
+</html>

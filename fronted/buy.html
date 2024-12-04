@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCKhco4FhJJrgj3jPtRFFpI3MxEuKljDKQ&libraries=places"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 500px;
+            margin: auto;
+            background: linear-gradient(45deg, #ffffffbe, #6f00ffbe);
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            position: relative;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #map {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .back-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: linear-gradient(45deg, #8dc8ff9a, #ffcae3be);
+            color: #000000;
+            text-decoration: none;
+            padding: 8px 15px;
+            font-size: 14px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .back-button:hover {
+            background-color: #bbb;
+        }
+        .error-message {
+            color: red;
+            font-size: 14px;
+            margin-top: -10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index0.html" class="back-button">Back</a>
+        <h1>Enter Your Details</h1>
+        <form id="checkoutForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="text" id="phone" placeholder="Phone Number" required>
+            <p id="phoneError" class="error-message" style="display: none;">Phone number must be exactly 10 digits.</p>
+            <input type="text" id="pin" placeholder="PIN Code" required>
+            <input type="text" id="city" placeholder="City" required>
+            <input type="text" id="location" placeholder="Select Location on Map" readonly required>
+            <div id="map"></div>
+            <button type="submit">Confirm</button>
+        </form>
+    </div>
+
+    <script>
+        let map, marker;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 26.2006, lng: 92.9376 }, // Center the map on Assam
+                zoom: 8,
+                gestureHandling: 'greedy',
+                zoomControl: true,
+            });
+
+            google.maps.event.addListener(map, 'click', function (event) {
+                const location = event.latLng;
+                if (marker) marker.setMap(null);
+                marker = new google.maps.Marker({
+                    position: location,
+                    map: map,
+                });
+                document.getElementById('location').value = `${location.lat()}, ${location.lng()}`;
+            });
+        }
+
+        window.onload = initMap;
+
+        const phoneInput = document.getElementById("phone");
+        const phoneError = document.getElementById("phoneError");
+
+        phoneInput.addEventListener("input", function () {
+            const value = phoneInput.value;
+            if (!/^\d{10}$/.test(value)) {
+                phoneError.style.display = "block";
+            } else {
+                phoneError.style.display = "none";
+            }
+        });
+
+        const form = document.getElementById('checkoutForm');
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (phoneError.style.display === "block") {
+                alert("Please correct the errors before submitting the form.");
+                return;
+            }
+            const formData = {
+                username: document.getElementById('username').value,
+                phone: document.getElementById('phone').value,
+                pin: document.getElementById('pin').value,
+                city: document.getElementById('city').value,
+                location: document.getElementById('location').value,
+            };
+            localStorage.setItem('formData', JSON.stringify(formData));
+            location.href = 'payment.html';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Options</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            width: 400px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .cod-button {
+            background-color: #007BFF;
+        }
+        .cod-button:hover {
+            background-color: #0056b3;
+        }
+        .message-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none; /* Hidden by default */
+        }
+        .message-box.success {
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+        .message-box.warning {
+            border-color: #007BFF;
+            color: #007BFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Choose Payment Method</h1>
+        <div class="button-container">
+            <!-- Google Pay Button -->
+            <div id="googlePayButton"></div>
+            <!-- Cash on Delivery Button -->
+            <button class="cod-button" onclick="handleCashOnDelivery()">Cash on Delivery</button>
+        </div>
+        <div id="messageBox" class="message-box"></div>
+    </div>
+
+    
+    <script>
+
+        function sendWhatsAppMessage(message) {
+            const phoneNumber = '+17753076505'; // Replace with dynamic phone number if needed
+            fetch('http://localhost:3000/send-whatsapp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    phoneNumber: phoneNumber,
+                    message: message,
+                }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+                return response.text();
+            })
+            .then(data => {
+                console.log('Message sent successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+            });
+        }
+    
+        function handleCashOnDelivery() {
+            const codConfirmed = confirm("Are you sure you want to pay via Cash on Delivery?");
+            if (codConfirmed) {
+                // Retrieve form data from localStorage
+                const formData = JSON.parse(localStorage.getItem('formData'));
+    
+                const combinedDetails = { 
+                    username: formData.username, 
+                    phone: formData.phone, 
+                    pin: formData.pin, 
+                    city: formData.city, 
+                    location: formData.location, 
+                    paymentMethod: "Cash on Delivery" 
+                };
+    
+                console.log("Combined Details:", combinedDetails);
+    
+                // Automatically send WhatsApp message
+                const message = `Order placed successfully with Cash on Delivery! \nDetails: ${JSON.stringify(combinedDetails)}`;
+                sendWhatsAppMessage(message);
+    
+                // Optionally show a message to the user
+                showMessage("Order placed successfully with Cash on Delivery!", "success");
+            }
+        }
+    
+        function showMessage(message, type) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`;
+            messageBox.style.display = "block";
+        }
+    </script>
+    
+    
+    
+    </script>
+</body>
+</html>

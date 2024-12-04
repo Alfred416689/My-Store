@@ -1,0 +1,397 @@
+/* Reset default styles for better consistency across browsers */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+.container {
+  width: 100%;
+  max-width: 2100px;
+  text-align: center;
+  background: url('nike55.jpg') repeat; /* Background pattern */
+  height: 940px;
+  max-height: 2200px;
+  animation: scroll-bg 30s linear infinite; /* Add animation */
+}
+
+/* Animation for scrolling background */
+@keyframes scroll-bg {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 100% 100%;
+  }
+}
+
+
+
+
+
+
+nav ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  justify-content:space-around;
+  background: #333;
+  color: white;
+  padding: 7px 0;
+  border:3px solid rgb(255, 255, 255) ;
+}
+
+
+nav ul li a {
+  color: white;
+  text-decoration: none;
+  font-size: 20px;
+  font-family: Monospace;
+ 
+}
+
+nav ul li a:hover {
+  text-decoration: underline;
+}
+
+.title {
+  color: antiquewhite;
+  font-size: 50px;
+ margin-top: 50px;
+ margin-bottom: 5px;
+  
+  font-family: 'Brush Script MT', cursive
+  
+  
+}
+
+.subtitle {
+  font-size: 30px;
+  color:#ffffffe6 ;
+  transition: color 0.3s ease;
+}
+
+.sneaker-wrapper {
+  position: relative;
+  width: 100%;
+  height: 390px;
+  overflow: hidden;
+  display: flex;
+  scroll-snap-type: x mandatory; /* Enable horizontal snap */
+  scroll-behavior: smooth; /* Smooth scrolling */
+  overflow-x: auto; /* Enable horizontal scrolling */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+
+
+.sneaker-container.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+
+
+
+
+
+
+.circle {
+  width: 300px;
+  height: 300px;
+  background-color: #eec5f9;
+  border-radius: 50%;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 5%;
+ 
+}
+
+.sneaker-img {
+  width: 370px;
+  height: auto;
+  transform: translateY(50px);
+  transition: transform 0.5s ease;
+}
+
+
+
+
+
+
+
+
+.sneaker-container.active .sneaker-img {
+  transform: translateY(-50px); /* Moves up into the circle */
+}
+
+/* Unique background colors for each sneaker-container */
+#sneaker-container-1 {
+  background-color:#000000bb ; /* Light Red */
+}
+
+#sneaker-container-2 {
+  background-color: #000000bb; /* Light Green */
+}
+
+#sneaker-container-3 {
+  background-color: #000000bb; /* Light Blue */
+}
+
+/* Buttons Styling */
+.buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 0px;
+}
+
+
+
+
+
+
+.arrow {
+  background: none;
+  color: #7700ff; /* Soft purple color */
+  font-size: 40px;
+  font-family: 'Arial', sans-serif;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+  margin-left: 125px;
+  margin-right: 125px;
+  border: 5px solid white;
+}
+
+.arrow:hover {
+  color: #483d8b; /* Darker purple on hover */
+  transform: scale(.5); /* Slight enlargement */
+  text-shadow: 0px 4px 8px rgba(0, 0, 0, 0.76); /* Enhance shadow on hover */
+}
+
+.arrow:focus {
+  outline: none;
+  color: #ff4500; /* Highlighted color for accessibility */
+  text-shadow: 0px 4px 10px rgba(255, 69, 0, 0.8); /* Glow effect on focus */
+}
+
+.arrow:active {
+  transform: scale(1.1); /* Slightly shrink when clicked */
+  text-shadow: 0px 2px 4px rgb(140, 0, 255); /* Subtle shadow change */
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* "BUY NOW" Button - fixed position */
+.buy-now {
+  position: fixed; /* Fixing the button's position */
+  bottom: 55px; /* Distance from the bottom of the page */
+  right: 140px; /* Distance from the right side of the page */
+  color: #ffffff;
+  font-size: 22px;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+  background: linear-gradient(45deg, #ffffffbe, #e100ffbe);
+  padding: 12px 12px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  display: inline-block;
+  z-index: 1000; /* Ensure it's on top of other elements */
+  border: 3px solid black;
+}
+
+/* "BUY NOW" Button Hover Effect */
+.buy-now:hover {
+  background: linear-gradient(45deg, #003cff8a, #cc00ff8e);
+  transform: scale(1.05);
+  box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+
+
+
+
+
+ 
+
+
+.sneaker-container {
+  position: relative;
+  flex: 0 0 100%; /* Each container takes full width */
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  scroll-snap-align: start; /* Snap to the start of each container */
+  opacity: 0;
+  transform: translateY(50px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+
+  /* Glass Effect */
+  
+
+  border-radius: 15px; /* Rounded corners for better effect */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+}
+
+.sneaker-container.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+
+
+
+
+nav ul li a {
+  text-decoration: none; /* Remove underline */
+  color: inherit; /* Inherit color from parent <ul> */
+}
+
+
+.price {
+  color: #ffffff;
+  font-size: 33px;
+  font-family: 'Impact, fantasy';
+  background: linear-gradient(45deg, #ffffff33, #0000002a);
+  padding: 7px 20px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.price:hover {
+  background: linear-gradient(45deg, #cc00ff8e, #003cff8a);
+  transform: scale(1.05);
+  box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+.description {
+  font-size: 20px;
+  font-family:Georgia, serif ;
+  color: #ea00ff;
+  text-align: center;
+  margin-top: 5px;
+  line-height: 1.7;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 0px;
+  border-radius: 8px;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Splash Screen */
+#splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.logo {
+  text-align: center;
+  
+}
+
+.logo-img {
+  width: 150px; /* Adjust size as needed */
+  height: auto;
+  animation: fade-in 2s ease-out; /* Smooth fade-in */
+  
+}
+
+.powered-by {
+  margin-top: 10px;
+  font-size: 30px;
+  color: #000000;
+  font-family:'Fantasy' ;
+  animation: fade-in 2s ease-out;
+}
+
+/* Fade-in Animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+
+
+
+
+
+
+.zoom {
+  color: #ffffff;
+  font-size: 25px;
+  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+ 
+  padding: 6px 20px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  display: inline-block;
+  margin-top: 315px;
+  border: 3px solid white;
+}
+
+.zoom:hover {
+  background: linear-gradient(45deg, #e100ffbe, #ffffffbd);
+  transform: scale(1.05);
+  box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
+}
