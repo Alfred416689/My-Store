@@ -1,0 +1,103 @@
+[
+  {
+    "id": 1,
+    "name": "Vintage Graphic Tee",
+    "price": 1499,
+    "category": "Graphic Tees",
+    "condition": "Good vintage wear",
+    "sizes": ["S", "M", "L", "XL"],
+    "stock": 3,
+    "badge": "New drop",
+    "image": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80",
+    "gallery": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "description": "A clean vintage graphic tee with an oversized silhouette and a faded print that keeps it authentic. Light wear around the collar and cuffs; fully wearable and ready for everyday rotation."
+  },
+  {
+    "id": 2,
+    "name": "Washed Oversized Tee",
+    "price": 1699,
+    "category": "Graphic Tees",
+    "condition": "Light wear",
+    "sizes": ["M", "L", "XL"],
+    "stock": 2,
+    "badge": "Limited piece",
+    "image": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
+    "gallery": [
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "description": "Soft washed cotton with a relaxed drape and worn-in finish. Minor fading at the hem and a subtle seam line, consistent with a pre-loved staple."
+  },
+  {
+    "id": 3,
+    "name": "Vintage Checked Shirt",
+    "price": 2199,
+    "category": "Vintage Shirts",
+    "condition": "Well loved",
+    "sizes": ["S", "M", "L"],
+    "stock": 1,
+    "badge": "One-of-one",
+    "image": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
+    "gallery": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "description": "A classic checked vintage shirt with a roomy cut and faded plaid pattern. Slight fray at the cuff and a small tonal stain on the back hem, honest and still full of character."
+  },
+  {
+    "id": 4,
+    "name": "Relaxed Denim Jeans",
+    "price": 2699,
+    "category": "Denim",
+    "condition": "Vintage wash",
+    "sizes": ["28", "30", "32", "34"],
+    "stock": 4,
+    "image": "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=1200&q=80",
+    "gallery": [
+      "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "description": "Relaxed straight-leg denim with a soft vintage fade and subtle whiskering. Measurements are listed on the product details and the fit is intentionally easy and lived-in."
+  },
+  {
+    "id": 5,
+    "name": "Retro Sportswear Jacket",
+    "price": 3399,
+    "category": "Jackets",
+    "condition": "Very good",
+    "sizes": ["S", "M", "L"],
+    "stock": 2,
+    "badge": "Limited stock",
+    "image": "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80",
+    "gallery": [
+      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "description": "A lightweight retro jacket with a sporty cut and structured shoulders. Some minor age wear around the zipper track, but overall in very good condition and easy to style."
+  },
+  {
+    "id": 6,
+    "name": "Vintage Statement Shirt",
+    "price": 1899,
+    "category": "Streetwear Finds",
+    "condition": "Good condition",
+    "sizes": ["M", "L", "XL"],
+    "stock": 3,
+    "badge": "New drop",
+    "image": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80",
+    "gallery": [
+      "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "description": "A expressive vintage shirt made for layering and standing out. Small softening around the collar and a faint mark near the right sleeve, intentionally retained for its lived-in story."
+  }
+]
