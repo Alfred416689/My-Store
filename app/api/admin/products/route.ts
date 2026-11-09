@@ -1,14 +1,12 @@
-import { connection } from "next/server";
-import { getAdminSession } from "@/app/lib/admin-auth";
+import { randomUUID } from "node:crypto";
+import { getAdminSession, isAdminConfigurationReady } from "@/app/lib/admin-auth";
 import { parseAdminProductInput } from "@/app/lib/admin-product-input";
+import { serializeCatalogProduct } from "@/app/lib/catalog";
+import { getImageExtension, removeImage, uploadImage } from "@/app/lib/storage";
 import {
-  ensureProductCatalog,
-  type CatalogProductDocument,
-} from "@/app/lib/catalog";
-import {
-  getDatabase,
-  getMongoConnectionErrorMessage,
-} from "@/app/lib/mongodb";
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+} from "@/app/lib/supabase";
 import {
   InvalidJsonBodyError,
   PayloadTooLargeError,
@@ -16,58 +14,60 @@ import {
 } from "@/app/lib/request-body";
 
 const maxRequestBytes = 7 * 1024 * 1024;
+const productFields =
+  "id,name,price,compare_at_price,category,collections,featured,condition,sizes,image,gallery,description,stock,badge";
 
 function errorResponse(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
-export async function GET() {
-  if (!(await getAdminSession())) {
-    return errorResponse("Sign in to manage products.", 401);
+async function getAuthorizedAdmin() {
+  if (!isAdminConfigurationReady()) {
+    return { admin: null, response: errorResponse("Supabase Auth and ADMIN_EMAIL must be configured.", 503) };
   }
-
-  await connection();
   try {
-    const products = await ensureProductCatalog(await getDatabase());
-    const inventory = await products
-      .find(
-        {},
-        {
-          projection: {
-            _id: 0,
-            id: 1,
-            name: 1,
-            price: 1,
-            compareAtPrice: 1,
-            category: 1,
-            collections: 1,
-            featured: 1,
-            condition: 1,
-            sizes: 1,
-            image: 1,
-            gallery: 1,
-            badge: 1,
-            stock: 1,
-            description: 1,
-          },
-        },
-      )
-      .sort({ id: -1 })
-      .toArray();
-    return Response.json({ products: inventory });
+    const admin = await getAdminSession();
+    return admin
+      ? { admin, response: null }
+      : { admin: null, response: errorResponse("Sign in to manage products.", 401) };
   } catch (error) {
-    console.error("Could not load products for admin management.", error);
+    console.error("Could not verify the admin session for product management.", error);
+    return {
+      admin: null,
+      response: errorResponse(
+        getSupabaseConnectionErrorMessage(error, "The admin session could not be verified."),
+        503,
+      ),
+    };
+  }
+}
+
+export async function GET() {
+  const authorization = await getAuthorizedAdmin();
+  if (!authorization.admin) return authorization.response;
+
+  try {
+    const { data, error } = await createSupabaseServiceClient()
+      .from("products")
+      .select(productFields)
+      .order("id", { ascending: false });
+    if (error) throw error;
+
+    return Response.json({
+      products: (data ?? []).map(serializeCatalogProduct),
+    });
+  } catch (error) {
+    console.error("Could not load products for admin management from Supabase.", error);
     return errorResponse(
-      getMongoConnectionErrorMessage(error, "Products could not be loaded."),
+      getSupabaseConnectionErrorMessage(error, "Products could not be loaded."),
       503,
     );
   }
 }
 
 export async function POST(request: Request) {
-  if (!(await getAdminSession())) {
-    return errorResponse("Sign in to add products.", 401);
-  }
+  const authorization = await getAuthorizedAdmin();
+  if (!authorization.admin) return authorization.response;
 
   if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
     return errorResponse("Send the product details as JSON.", 415);
@@ -88,68 +88,66 @@ export async function POST(request: Request) {
   }
 
   const productInput = parseAdminProductInput(body, true);
-  if (!productInput || !productInput.image) {
+  if (!productInput?.image) {
     return errorResponse(
       "Check all product fields, choose at least one collection, and add a valid JPG, PNG, or WebP image up to 5 MB.",
       400,
     );
   }
 
-  await connection();
-
+  let createdId: number | undefined;
+  let uploadedPath: string | undefined;
   try {
-    const database = await getDatabase();
-    const products = await ensureProductCatalog(database);
-    const latestProduct = await products
-      .find({}, { projection: { id: 1 } })
-      .sort({ id: -1 })
-      .limit(1)
-      .next();
-    const counters = database.collection<{ _id: string; value: number }>("counters");
+    const supabase = createSupabaseServiceClient();
+    const { image, compareAtPrice, badge, ...fields } = productInput;
+    const { data: createdProduct, error: createError } = await supabase
+      .from("products")
+      .insert({
+        ...fields,
+        compare_at_price: compareAtPrice ?? null,
+        badge: badge ?? null,
+        image: "",
+        gallery: [],
+        image_path: null,
+      })
+      .select("id")
+      .single();
 
-    await counters.updateOne(
-      { _id: "products" },
-      { $max: { value: latestProduct?.id ?? 0 } },
-      { upsert: true },
-    );
-    const counter = await counters.findOneAndUpdate(
-      { _id: "products" },
-      { $inc: { value: 1 } },
-      { returnDocument: "after" },
-    );
-    if (!counter || !Number.isSafeInteger(counter.value)) {
-      throw new Error("Could not allocate a product ID.");
-    }
+    if (createError) throw createError;
+    createdId = createdProduct.id;
 
-    const id = counter.value;
-    const imageUrl = `/api/products/${id}/image`;
-    const { image: productImage, ...productFields } = productInput;
-    const product: CatalogProductDocument = {
-      id,
-      ...productFields,
-      image: imageUrl,
-      gallery: [imageUrl],
-      imageData: productImage,
-    };
+    uploadedPath = `products/${createdId}/${randomUUID()}.${getImageExtension(image.contentType)}`;
+    await uploadImage(uploadedPath, image.contentType, image.data);
+    const imageUrl = `/api/products/${createdId}/image`;
+    const { data: product, error: updateError } = await supabase
+      .from("products")
+      .update({ image: imageUrl, gallery: [imageUrl], image_path: uploadedPath })
+      .eq("id", createdId)
+      .select(productFields)
+      .single();
 
-    await products.insertOne(product);
-    return Response.json(
-      {
-        product: {
-          id,
-          ...productFields,
-          image: imageUrl,
-          gallery: [imageUrl],
-        },
-      },
-      { status: 201 },
-    );
+    if (updateError) throw updateError;
+    return Response.json({ product: serializeCatalogProduct(product) }, { status: 201 });
   } catch (error) {
-    console.error("Could not add the product to MongoDB.", error);
+    if (uploadedPath) {
+      try {
+        await removeImage(uploadedPath);
+      } catch (cleanupError) {
+        console.error("Could not remove the unreferenced product image.", cleanupError);
+      }
+    }
+    if (createdId !== undefined) {
+      const { error: deleteError } = await createSupabaseServiceClient()
+        .from("products")
+        .delete()
+        .eq("id", createdId);
+      if (deleteError) console.error("Could not remove the incomplete product record.", deleteError);
+    }
+    console.error("Could not add the product to Supabase.", error);
     return errorResponse(
-      getMongoConnectionErrorMessage(
+      getSupabaseConnectionErrorMessage(
         error,
-        "The product could not be saved. Check the MongoDB connection and try again.",
+        "The product could not be saved. Check the Supabase connection and try again.",
       ),
       503,
     );

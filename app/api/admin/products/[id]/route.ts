@@ -1,11 +1,12 @@
-import { connection } from "next/server";
-import { getAdminSession } from "@/app/lib/admin-auth";
+import { randomUUID } from "node:crypto";
+import { getAdminSession, isAdminConfigurationReady } from "@/app/lib/admin-auth";
 import { parseAdminProductInput } from "@/app/lib/admin-product-input";
-import { ensureProductCatalog } from "@/app/lib/catalog";
+import { serializeCatalogProduct } from "@/app/lib/catalog";
+import { getImageExtension, removeImage, uploadImage } from "@/app/lib/storage";
 import {
-  getDatabase,
-  getMongoConnectionErrorMessage,
-} from "@/app/lib/mongodb";
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+} from "@/app/lib/supabase";
 import {
   InvalidJsonBodyError,
   PayloadTooLargeError,
@@ -13,6 +14,8 @@ import {
 } from "@/app/lib/request-body";
 
 const maxRequestBytes = 7 * 1024 * 1024;
+const productFields =
+  "id,name,price,compare_at_price,category,collections,featured,condition,sizes,image,gallery,description,stock,badge";
 
 function errorResponse(message: string, status: number) {
   return Response.json({ error: message }, { status });
@@ -22,8 +25,20 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!(await getAdminSession())) {
-    return errorResponse("Sign in to edit products.", 401);
+  if (!isAdminConfigurationReady()) {
+    return errorResponse("Supabase Auth and ADMIN_EMAIL must be configured.", 503);
+  }
+
+  try {
+    if (!(await getAdminSession())) {
+      return errorResponse("Sign in to edit products.", 401);
+    }
+  } catch (error) {
+    console.error("Could not verify the admin session for product editing.", error);
+    return errorResponse(
+      getSupabaseConnectionErrorMessage(error, "The admin session could not be verified."),
+      503,
+    );
   }
 
   const { id } = await context.params;
@@ -53,40 +68,73 @@ export async function PATCH(
     return errorResponse("Check all product fields and choose at least one collection.", 400);
   }
 
-  await connection();
+  const productId = Number(id);
+  let uploadedPath: string | undefined;
   try {
-    const products = await ensureProductCatalog(await getDatabase());
-    const imageUrl = `/api/products/${id}/image`;
-    const { image, ...productFields } = productInput;
-    const setFields = {
-      ...productFields,
-      ...(image ? { image: imageUrl, gallery: [imageUrl], imageData: image } : {}),
-    };
-    const update = await products.updateOne(
-      { id: Number(id) },
-      {
-        $set: setFields,
-        $unset: {
-          ...(productInput.compareAtPrice === undefined ? { compareAtPrice: "" } : {}),
-          ...(productInput.badge === undefined ? { badge: "" } : {}),
-        },
-      },
-    );
-    if (!update.matchedCount) return errorResponse("Product not found.", 404);
+    const supabase = createSupabaseServiceClient();
+    const { data: currentProduct, error: currentError } = await supabase
+      .from("products")
+      .select("image_path")
+      .eq("id", productId)
+      .maybeSingle();
+    if (currentError) throw currentError;
+    if (!currentProduct) return errorResponse("Product not found.", 404);
 
-    return Response.json({
-      product: {
-        id: Number(id),
-        ...productFields,
-        ...(image ? { image: imageUrl, gallery: [imageUrl] } : {}),
-      },
-    });
+    const { image, ...fields } = productInput;
+    const imageUrl = `/api/products/${productId}/image`;
+    if (image) {
+      uploadedPath = `products/${productId}/${randomUUID()}.${getImageExtension(image.contentType)}`;
+      await uploadImage(uploadedPath, image.contentType, image.data);
+    }
+
+    const { data: product, error: updateError } = await supabase
+      .from("products")
+      .update({
+        name: fields.name,
+        price: fields.price,
+        compare_at_price: fields.compareAtPrice ?? null,
+        category: fields.category,
+        collections: fields.collections,
+        featured: fields.featured,
+        condition: fields.condition,
+        sizes: fields.sizes,
+        stock: fields.stock,
+        badge: fields.badge ?? null,
+        description: fields.description,
+        ...(image && uploadedPath
+          ? { image: imageUrl, gallery: [imageUrl], image_path: uploadedPath }
+          : {}),
+      })
+      .eq("id", productId)
+      .select(productFields)
+      .maybeSingle();
+    if (updateError) throw updateError;
+    if (!product) {
+      if (uploadedPath) await removeImage(uploadedPath);
+      return errorResponse("Product not found.", 404);
+    }
+
+    if (uploadedPath && currentProduct.image_path) {
+      try {
+        await removeImage(currentProduct.image_path);
+      } catch (cleanupError) {
+        console.error("Could not remove the replaced product image.", cleanupError);
+      }
+    }
+    return Response.json({ product: serializeCatalogProduct(product) });
   } catch (error) {
-    console.error("Could not update the product in MongoDB.", error);
+    if (uploadedPath) {
+      try {
+        await removeImage(uploadedPath);
+      } catch (cleanupError) {
+        console.error("Could not remove the unreferenced replacement image.", cleanupError);
+      }
+    }
+    console.error("Could not update the product in Supabase.", error);
     return errorResponse(
-      getMongoConnectionErrorMessage(
+      getSupabaseConnectionErrorMessage(
         error,
-        "The product could not be saved. Check the MongoDB connection and try again.",
+        "The product could not be saved. Check the Supabase connection and try again.",
       ),
       503,
     );

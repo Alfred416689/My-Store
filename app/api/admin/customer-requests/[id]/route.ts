@@ -1,26 +1,34 @@
-import { ObjectId } from "mongodb";
-import { connection } from "next/server";
-import { getAdminSession } from "@/app/lib/admin-auth";
+import { getAdminSession, isAdminConfigurationReady } from "@/app/lib/admin-auth";
+import { serializeCustomerRequest } from "@/app/lib/customer-requests";
 import {
-  type CustomerRequestDocument,
-  serializeCustomerRequest,
-} from "@/app/lib/customer-requests";
-import {
-  getDatabase,
-  getMongoConnectionErrorMessage,
-} from "@/app/lib/mongodb";
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+} from "@/app/lib/supabase";
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const admin = await getAdminSession();
+  if (!isAdminConfigurationReady()) {
+    return Response.json({ error: "Supabase Auth and ADMIN_EMAIL must be configured." }, { status: 503 });
+  }
+
+  let admin: Awaited<ReturnType<typeof getAdminSession>>;
+  try {
+    admin = await getAdminSession();
+  } catch (error) {
+    console.error("Could not verify the admin session for request approval.", error);
+    return Response.json(
+      { error: getSupabaseConnectionErrorMessage(error, "The admin session could not be verified.") },
+      { status: 503 },
+    );
+  }
   if (!admin) {
     return Response.json({ error: "Sign in to approve customer requests." }, { status: 401 });
   }
 
   const { id } = await context.params;
-  if (!/^[a-f\d]{24}$/i.test(id)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
     return Response.json({ error: "Request not found." }, { status: 404 });
   }
 
@@ -40,42 +48,38 @@ export async function PATCH(
     return Response.json({ error: "Choose a valid request action." }, { status: 400 });
   }
 
-  await connection();
-
   try {
-    const database = await getDatabase();
-    const collection = database.collection<CustomerRequestDocument>("customerRequests");
-    const result = await collection.updateOne(
-      { _id: new ObjectId(id), status: "Pending" },
-      {
-        $set: {
-          status: "Approved",
-          approvedAt: new Date(),
-          approvedBy: admin.email,
-        },
-      },
-    );
+    const supabase = createSupabaseServiceClient();
+    const { data: updatedRequest, error } = await supabase
+      .from("customer_requests")
+      .update({
+        status: "Approved",
+        approved_at: new Date().toISOString(),
+        approved_by: admin.email,
+      })
+      .eq("id", id)
+      .eq("status", "Pending")
+      .select("id,name,category,brand,size,colour,budget,details,status,requested_at,image_path")
+      .maybeSingle();
 
-    if (result.matchedCount === 0) {
+    if (error) throw error;
+    if (!updatedRequest) {
       return Response.json(
         { error: "This request was already reviewed or no longer exists." },
         { status: 409 },
       );
     }
 
-    const approvedRequest = await collection.findOne({ _id: new ObjectId(id) });
-    if (!approvedRequest) {
-      return Response.json({ error: "The approved request could not be reloaded." }, { status: 500 });
-    }
-
-    return Response.json({ request: serializeCustomerRequest(approvedRequest) });
+    return Response.json({
+      request: serializeCustomerRequest(updatedRequest),
+    });
   } catch (error) {
-    console.error("Could not approve the customer request in MongoDB.", error);
+    console.error("Could not approve the customer request in Supabase.", error);
     return Response.json(
       {
-        error: getMongoConnectionErrorMessage(
+        error: getSupabaseConnectionErrorMessage(
           error,
-          "The request could not be approved. Check the MongoDB connection.",
+          "The request could not be approved. Check the Supabase connection.",
         ),
       },
       { status: 503 },

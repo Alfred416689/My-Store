@@ -1,11 +1,9 @@
-import { Binary } from "mongodb";
 import { connection } from "next/server";
-import { getDatabase, getMongoConnectionErrorMessage } from "@/app/lib/mongodb";
-
-type ProductImageDocument = {
-  id: number;
-  imageData?: { contentType: string; data: Binary };
-};
+import {
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+  supabaseStorageBucket,
+} from "@/app/lib/supabase";
 
 export async function GET(
   _request: Request,
@@ -19,25 +17,32 @@ export async function GET(
   await connection();
 
   try {
-    const product = await (await getDatabase())
-      .collection<ProductImageDocument>("products")
-      .findOne({ id: Number(id) }, { projection: { imageData: 1 } });
+    const supabase = createSupabaseServiceClient();
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("image_path")
+      .eq("id", Number(id))
+      .maybeSingle();
 
-    if (!product?.imageData) {
-      return new Response("Not found", { status: 404 });
-    }
+    if (productError) throw productError;
+    if (!product?.image_path) return new Response("Not found", { status: 404 });
 
-    return new Response(Buffer.from(product.imageData.data.value()), {
+    const { data: image, error: imageError } = await supabase.storage
+      .from(supabaseStorageBucket)
+      .download(product.image_path);
+    if (imageError) throw imageError;
+
+    return new Response(image, {
       headers: {
-        "Content-Type": product.imageData.contentType,
+        "Content-Type": image.type || "application/octet-stream",
         "Cache-Control": "public, max-age=3600",
         "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {
-    console.error("Could not load a product image from MongoDB.", error);
+    console.error("Could not load a product image from Supabase.", error);
     return new Response(
-      getMongoConnectionErrorMessage(error, "Image unavailable"),
+      getSupabaseConnectionErrorMessage(error, "Image unavailable"),
       { status: 503 },
     );
   }

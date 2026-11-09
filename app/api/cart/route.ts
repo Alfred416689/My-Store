@@ -1,11 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { Collection, Db, Document } from "mongodb";
 import { connection } from "next/server";
-import { ensureProductCatalog } from "@/app/lib/catalog";
 import {
-  getDatabase,
-  getMongoConnectionErrorMessage,
-} from "@/app/lib/mongodb";
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+} from "@/app/lib/supabase";
 import {
   InvalidJsonBodyError,
   PayloadTooLargeError,
@@ -22,13 +20,7 @@ type StoredCartItem = {
   quantity: number;
 };
 
-type CartDocument = Document & {
-  sessionId: string;
-  items: StoredCartItem[];
-  updatedAt: Date;
-};
-
-type ProductDocument = Document & {
+type ProductDocument = {
   id: number;
   name: string;
   price: number;
@@ -42,13 +34,6 @@ type CartItem = StoredCartItem & {
   price: number;
   image: string;
 };
-
-type CartCollections = {
-  carts: Collection<CartDocument>;
-  products: Awaited<ReturnType<typeof ensureProductCatalog>>;
-};
-
-const collectionsByDatabase = new WeakMap<Db, Promise<CartCollections>>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -82,11 +67,7 @@ function sessionKey(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function jsonResponse(
-  body: unknown,
-  status = 200,
-  token?: string,
-) {
+function jsonResponse(body: unknown, status = 200, token?: string) {
   const response = Response.json(body, {
     status,
     headers: { "Cache-Control": "private, no-store" },
@@ -132,27 +113,11 @@ function parseCartItems(value: unknown): StoredCartItem[] | null {
 
 async function hydrateCart(
   items: StoredCartItem[],
-  products: Awaited<ReturnType<typeof ensureProductCatalog>>,
+  products: ProductDocument[],
 ): Promise<CartItem[] | null> {
   if (items.length === 0) return [];
 
-  const productDocuments = await products
-    .find<ProductDocument>(
-      { id: { $in: items.map((item) => item.productId) } },
-      {
-        projection: {
-          _id: 0,
-          id: 1,
-          name: 1,
-          price: 1,
-          image: 1,
-          sizes: 1,
-          stock: 1,
-        },
-      },
-    )
-    .toArray();
-  const productById = new Map(productDocuments.map((product) => [product.id, product]));
+  const productById = new Map(products.map((product) => [product.id, product]));
   const quantityByProduct = new Map<number, number>();
   const hydratedItems: CartItem[] = [];
 
@@ -175,26 +140,15 @@ async function hydrateCart(
   return hydratedItems;
 }
 
-async function getCollections() {
-  const database = await getDatabase();
-  let collections = collectionsByDatabase.get(database);
-  if (!collections) {
-    collections = (async () => {
-      const carts = database.collection<CartDocument>("shoppingCarts");
-      await Promise.all([
-        carts.createIndex({ sessionId: 1 }, { unique: true }),
-        carts.createIndex(
-          { updatedAt: 1 },
-          { expireAfterSeconds: sessionMaxAgeSeconds },
-        ),
-      ]);
-      const products = await ensureProductCatalog(database);
-      return { carts, products };
-    })();
-    collectionsByDatabase.set(database, collections);
-    void collections.catch(() => collectionsByDatabase.delete(database));
-  }
-  return collections;
+async function getProducts(items: StoredCartItem[]) {
+  if (items.length === 0) return [];
+
+  const { data, error } = await createSupabaseServiceClient()
+    .from("products")
+    .select("id,name,price,image,sizes,stock")
+    .in("id", [...new Set(items.map((item) => item.productId))]);
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function GET(request: Request) {
@@ -202,9 +156,20 @@ export async function GET(request: Request) {
   const { token, isNew } = getOrCreateSessionToken(request);
 
   try {
-    const { carts, products } = await getCollections();
-    const cart = await carts.findOne({ sessionId: sessionKey(token) });
-    const items = await hydrateCart(cart?.items ?? [], products);
+    const supabase = createSupabaseServiceClient();
+    const { error: pruneError } = await supabase.rpc("prune_expired_shopping_carts");
+    if (pruneError) throw pruneError;
+
+    const now = new Date().toISOString();
+    const { data: cart, error } = await supabase
+      .from("shopping_carts")
+      .select("items")
+      .eq("session_id", sessionKey(token))
+      .gt("expires_at", now)
+      .maybeSingle();
+    if (error) throw error;
+
+    const items = cart ? parseCartItems({ items: cart.items }) : [];
     if (!items) {
       return jsonResponse(
         { error: "A saved item is no longer available. Please rebuild your bag." },
@@ -212,14 +177,23 @@ export async function GET(request: Request) {
         isNew ? token : undefined,
       );
     }
-    return jsonResponse({ items }, 200, isNew ? token : undefined);
+
+    const hydratedItems = await hydrateCart(items, await getProducts(items));
+    if (!hydratedItems) {
+      return jsonResponse(
+        { error: "A saved item is no longer available. Please rebuild your bag." },
+        409,
+        isNew ? token : undefined,
+      );
+    }
+    return jsonResponse({ items: hydratedItems }, 200, isNew ? token : undefined);
   } catch (error) {
-    console.error("Could not load the shopping bag from MongoDB.", error);
+    console.error("Could not load the shopping bag from Supabase.", error);
     return jsonResponse(
       {
-        error: getMongoConnectionErrorMessage(
+        error: getSupabaseConnectionErrorMessage(
           error,
-          "The shopping bag could not be loaded. Check the MongoDB connection.",
+          "The shopping bag could not be loaded. Check the Supabase connection.",
         ),
       },
       503,
@@ -253,8 +227,11 @@ export async function POST(request: Request) {
 
   const { token, isNew } = getOrCreateSessionToken(request);
   try {
-    const { carts, products } = await getCollections();
-    const hydratedItems = await hydrateCart(items, products);
+    const supabase = createSupabaseServiceClient();
+    const { error: pruneError } = await supabase.rpc("prune_expired_shopping_carts");
+    if (pruneError) throw pruneError;
+
+    const hydratedItems = await hydrateCart(items, await getProducts(items));
     if (!hydratedItems) {
       return jsonResponse(
         { error: "A selected size or quantity is no longer available." },
@@ -263,29 +240,28 @@ export async function POST(request: Request) {
       );
     }
 
-    await carts.updateOne(
-      { sessionId: sessionKey(token) },
-      {
-        $set: {
-          items: items.map(({ productId, size, quantity }) => ({
-            productId,
-            size,
-            quantity,
-          })),
-          updatedAt: new Date(),
+    const now = new Date();
+    const { error } = await supabase
+      .from("shopping_carts")
+      .upsert(
+        {
+          session_id: sessionKey(token),
+          items,
+          updated_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + sessionMaxAgeSeconds * 1000).toISOString(),
         },
-      },
-      { upsert: true },
-    );
+        { onConflict: "session_id" },
+      );
+    if (error) throw error;
 
     return jsonResponse({ items: hydratedItems }, 200, isNew ? token : undefined);
   } catch (error) {
-    console.error("Could not save the shopping bag to MongoDB.", error);
+    console.error("Could not save the shopping bag to Supabase.", error);
     return jsonResponse(
       {
-        error: getMongoConnectionErrorMessage(
+        error: getSupabaseConnectionErrorMessage(
           error,
-          "The shopping bag could not be saved. Check the MongoDB connection.",
+          "The shopping bag could not be saved. Check the Supabase connection.",
         ),
       },
       503,

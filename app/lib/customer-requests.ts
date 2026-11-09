@@ -1,13 +1,7 @@
-import {
-  Binary,
-  type Collection,
-  type Db,
-  type Document,
-} from "mongodb";
-
 export type CustomerRequestStatus = "Pending" | "Approved";
 
-export type CustomerRequestDocument = Document & {
+export type CustomerRequestRow = {
+  id: string;
   name: string;
   category: string;
   brand: string;
@@ -16,36 +10,13 @@ export type CustomerRequestDocument = Document & {
   budget: number;
   details: string;
   status: CustomerRequestStatus;
-  requestedAt: Date;
-  approvedAt?: Date;
-  approvedBy?: string;
-  hasImage: boolean;
-  image: { contentType: string; data: Binary } | null;
+  requested_at: string;
+  image_path: string | null;
 };
 
-const collectionsByDatabase = new WeakMap<
-  Db,
-  Promise<Collection<CustomerRequestDocument>>
->();
-
-export function getCustomerRequestCollection(database: Db) {
-  let collection = collectionsByDatabase.get(database);
-  if (!collection) {
-    collection = (async () => {
-      const requests = database.collection<CustomerRequestDocument>("customerRequests");
-      await requests.createIndex({ status: 1, requestedAt: -1 });
-      return requests;
-    })();
-    collectionsByDatabase.set(database, collection);
-    void collection.catch(() => collectionsByDatabase.delete(database));
-  }
-  return collection;
-}
-
-export function serializeCustomerRequest(document: CustomerRequestDocument) {
-  const id = document._id.toString();
+export function serializeCustomerRequest(document: CustomerRequestRow) {
   return {
-    id,
+    id: document.id,
     name: document.name,
     category: document.category,
     brand: document.brand,
@@ -53,8 +24,8 @@ export function serializeCustomerRequest(document: CustomerRequestDocument) {
     colour: document.colour,
     budget: document.budget,
     details: document.details,
-    image: document.hasImage ? `/api/customer-requests/${id}/image` : "",
+    image: document.image_path ? `/api/customer-requests/${document.id}/image` : "",
     status: document.status,
-    requestedAt: document.requestedAt.toISOString(),
+    requestedAt: document.requested_at,
   };
 }

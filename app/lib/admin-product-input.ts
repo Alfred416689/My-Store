@@ -1,4 +1,3 @@
-import { Binary } from "mongodb";
 import type { ProductCollection } from "@/app/lib/catalog";
 
 const maxImageBytes = 5 * 1024 * 1024;
@@ -16,7 +15,7 @@ export type AdminProductInput = {
   stock: number;
   badge?: string;
   description: string;
-  image?: { contentType: string; data: Binary };
+  image?: { contentType: string; data: Buffer };
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,7 +35,7 @@ function parseImage(value: unknown) {
 
   const data = Buffer.from(match[2], "base64");
   if (data.length === 0 || data.length > maxImageBytes) return null;
-  return { contentType: match[1], data: new Binary(data) };
+  return { contentType: match[1], data };
 }
 
 export function parseAdminProductInput(

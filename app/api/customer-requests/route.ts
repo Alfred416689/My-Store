@@ -1,14 +1,11 @@
-import { Binary } from "mongodb";
+import { randomUUID } from "node:crypto";
 import { connection } from "next/server";
+import { serializeCustomerRequest } from "@/app/lib/customer-requests";
+import { getImageExtension, removeImage, uploadImage } from "@/app/lib/storage";
 import {
-  type CustomerRequestDocument,
-  getCustomerRequestCollection,
-  serializeCustomerRequest,
-} from "@/app/lib/customer-requests";
-import {
-  getDatabase,
-  getMongoConnectionErrorMessage,
-} from "@/app/lib/mongodb";
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+} from "@/app/lib/supabase";
 import {
   InvalidJsonBodyError,
   PayloadTooLargeError,
@@ -98,7 +95,7 @@ function parseImage(value: string) {
     return undefined;
   }
 
-  return { contentType: match[1], data: new Binary(data) };
+  return { contentType: match[1], data };
 }
 
 function errorResponse(message: string, status: number) {
@@ -114,15 +111,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const requestCollection = await getCustomerRequestCollection(await getDatabase());
-    const requests = await requestCollection
-      .find({ status: "Approved" }, { projection: { image: 0 } })
-      .sort({ requestedAt: -1 })
-      .limit(limit)
-      .toArray();
+    const { data, error } = await createSupabaseServiceClient()
+      .from("customer_requests")
+      .select("id,name,category,brand,size,colour,budget,details,status,requested_at,image_path")
+      .eq("status", "Approved")
+      .order("requested_at", { ascending: false })
+      .limit(limit);
 
+    if (error) throw error;
     return Response.json(
-      { requests: requests.map(serializeCustomerRequest) },
+      { requests: (data ?? []).map(serializeCustomerRequest) },
       {
         headers: {
           "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=120",
@@ -130,11 +128,11 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    console.error("Could not load customer requests from MongoDB.", error);
+    console.error("Could not load approved customer requests from Supabase.", error);
     return errorResponse(
-      getMongoConnectionErrorMessage(
+      getSupabaseConnectionErrorMessage(
         error,
-        "Customer requests are temporarily unavailable. Check the MongoDB connection.",
+        "Customer requests are temporarily unavailable. Check the Supabase connection.",
       ),
       503,
     );
@@ -170,32 +168,48 @@ export async function POST(request: Request) {
     return errorResponse("Choose a valid JPG, PNG, or WebP reference image up to 5 MB.", 400);
   }
 
-  const document = {
-    name: input.name,
-    category: input.category,
-    brand: input.brand,
-    size: input.size,
-    colour: input.colour,
-    budget: input.budget,
-    details: input.details,
-    status: "Pending" as const,
-    requestedAt: new Date(),
-    hasImage: image !== null,
-    image,
-  };
+  const id = randomUUID();
+  const imagePath = image
+    ? `requests/${id}.${getImageExtension(image.contentType)}`
+    : null;
 
   try {
-    const result = await (await getDatabase())
-      .collection<CustomerRequestDocument>("customerRequests")
-      .insertOne(document);
-    const savedRequest = { ...document, _id: result.insertedId };
-    return Response.json({ request: serializeCustomerRequest(savedRequest) }, { status: 201 });
+    if (image && imagePath) {
+      await uploadImage(imagePath, image.contentType, image.data);
+    }
+
+    const { data, error } = await createSupabaseServiceClient()
+      .from("customer_requests")
+      .insert({
+        id,
+        name: input.name,
+        category: input.category,
+        brand: input.brand,
+        size: input.size,
+        colour: input.colour,
+        budget: input.budget,
+        details: input.details,
+        status: "Pending",
+        image_path: imagePath,
+      })
+      .select("id,name,category,brand,size,colour,budget,details,status,requested_at,image_path")
+      .single();
+
+    if (error) throw error;
+    return Response.json({ request: serializeCustomerRequest(data) }, { status: 201 });
   } catch (error) {
-    console.error("Could not save the customer request to MongoDB.", error);
+    if (imagePath) {
+      try {
+        await removeImage(imagePath);
+      } catch (cleanupError) {
+        console.error("Could not remove the unreferenced customer request image.", cleanupError);
+      }
+    }
+    console.error("Could not save the customer request to Supabase.", error);
     return errorResponse(
-      getMongoConnectionErrorMessage(
+      getSupabaseConnectionErrorMessage(
         error,
-        "Your request could not be saved. Check the MongoDB connection and try again.",
+        "Your request could not be saved. Check the Supabase connection and try again.",
       ),
       503,
     );

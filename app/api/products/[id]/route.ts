@@ -1,9 +1,9 @@
 import { connection } from "next/server";
-import { ensureProductCatalog } from "@/app/lib/catalog";
+import { serializeCatalogProduct } from "@/app/lib/catalog";
 import {
-  getDatabase,
-  getMongoConnectionErrorMessage,
-} from "@/app/lib/mongodb";
+  createSupabaseServiceClient,
+  getSupabaseConnectionErrorMessage,
+} from "@/app/lib/supabase";
 
 export async function GET(
   _request: Request,
@@ -17,33 +17,19 @@ export async function GET(
   await connection();
 
   try {
-    const products = await ensureProductCatalog(await getDatabase());
-    const product = await products.findOne(
-      { id: Number(id) },
-      {
-        projection: {
-          _id: 0,
-          id: 1,
-          name: 1,
-          price: 1,
-          category: 1,
-          condition: 1,
-          sizes: 1,
-          image: 1,
-          gallery: 1,
-          badge: 1,
-          stock: 1,
-          description: 1,
-        },
-      },
-    );
+    const { data: product, error } = await createSupabaseServiceClient()
+      .from("products")
+      .select("id,name,price,compare_at_price,category,collections,featured,condition,sizes,image,gallery,image_path,description,stock,badge")
+      .eq("id", Number(id))
+      .maybeSingle();
 
+    if (error) throw error;
     if (!product) {
       return Response.json({ error: "Product not found." }, { status: 404 });
     }
 
     return Response.json(
-      { product },
+      { product: serializeCatalogProduct(product) },
       {
         headers: {
           "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
@@ -51,12 +37,12 @@ export async function GET(
       },
     );
   } catch (error) {
-    console.error("Could not load product details from MongoDB.", error);
+    console.error("Could not load product details from Supabase.", error);
     return Response.json(
       {
-        error: getMongoConnectionErrorMessage(
+        error: getSupabaseConnectionErrorMessage(
           error,
-          "Product details are temporarily unavailable. Check the MongoDB connection.",
+          "Product details are temporarily unavailable. Check the Supabase connection.",
         ),
       },
       { status: 503 },
